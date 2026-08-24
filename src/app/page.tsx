@@ -151,7 +151,7 @@ export default function Home() {
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Asset Ordering</h1>
             <p className="text-sm text-slate-500 mt-1">Interactive region and country-wise tracking</p>
           </div>
-          <div className="mt-4 md:mt-0 flex flex-wrap gap-4">
+          <div className="mt-4 md:mt-0 flex flex-wrap gap-4 items-end">
             <div className="flex flex-col">
               <label className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Region</label>
               <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} className="px-3 py-2 border rounded-lg bg-slate-50 shadow-inner min-w-[150px]">
@@ -173,13 +173,67 @@ export default function Home() {
                 {statuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-            <div className="flex flex-col justify-end">
+            <div className="flex space-x-2">
               <button 
                 onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} 
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors font-medium"
               >
-                Clear Filters
+                Clear
               </button>
+              <label className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium shadow-sm flex items-center">
+                <span className="mr-2">Upload Data</span>
+                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={async (e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                      try {
+                        setLoading(true);
+                        const { read, utils } = await import('xlsx');
+                        const workbook = read(event.target?.result, { type: 'binary' });
+                        const sheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[sheetName];
+                        const rawData = utils.sheet_to_json(sheet);
+                        
+                        const formattedData = rawData.map((row: any) => ({
+                          id: row['ID '],
+                          bundle: row[' Bundle '] ? Number(row[' Bundle ']) : null,
+                          region: row[' Region '],
+                          country: row[' Country '],
+                          model: row[' Model '],
+                          quantity: Number(row[' Quantity ']) || 0,
+                          inProgress: Number(row[' InProgress ']) || 0,
+                          ordered: Number(row[' Ordered ']) || 0,
+                          inTransit: Number(row[' InTransit ']) || 0,
+                          delivered: Number(row[' Delivered ']) || 0,
+                          toBeOrdered: Number(row[' ToBeOrdered ']) || 0,
+                          status: row[' Status '] || null,
+                          lastUpdatedBy: row[' LastUpdatedBy '] || null,
+                        })).filter(row => row.id);
+
+                        const res = await fetch('/api/orders/bulk', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(formattedData)
+                        });
+
+                        if (res.ok) {
+                          alert('Data uploaded successfully!');
+                          window.location.reload();
+                        } else {
+                          alert('Failed to upload data.');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        alert('Error processing file.');
+                      } finally {
+                        setLoading(false);
+                      }
+                    };
+                    reader.readAsBinaryString(file);
+                  }
+                }} />
+              </label>
             </div>
           </div>
         </header>
@@ -279,10 +333,10 @@ export default function Home() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-semibold border-b border-slate-100">ID</th>
                     <th className="p-4 font-semibold border-b border-slate-100">Region / Country</th>
                     <th className="p-4 font-semibold border-b border-slate-100">Model</th>
                     <th className="p-4 font-semibold border-b border-slate-100 text-right">Qty</th>
+                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Pending Qty</th>
                     <th className="p-4 font-semibold border-b border-slate-100 text-right">Ordered</th>
                     <th className="p-4 font-semibold border-b border-slate-100 text-right">Delivered</th>
                     <th className="p-4 font-semibold border-b border-slate-100">Status</th>
@@ -292,13 +346,13 @@ export default function Home() {
                 <tbody className="divide-y divide-slate-100">
                   {orders.map((order) => (
                     <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
-                      <td className="p-4 text-sm font-medium text-slate-700">{order.id}</td>
                       <td className="p-4 text-sm text-slate-600">
                         <div className="font-medium text-slate-800">{order.region}</div>
                         <div className="text-xs text-slate-500">{order.country}</div>
                       </td>
                       <td className="p-4 text-sm text-slate-600">{order.model}</td>
                       <td className="p-4 text-sm text-right font-medium text-slate-700">{order.quantity}</td>
+                      <td className="p-4 text-sm text-right text-orange-600 font-semibold">{order.toBeOrdered}</td>
                       <td className="p-4 text-sm text-right text-blue-600 font-semibold">{order.ordered}</td>
                       <td className="p-4 text-sm text-right text-green-600 font-semibold">{order.delivered}</td>
                       <td className="p-4 text-sm">
