@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -28,9 +28,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json(updatedOrder);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating order:', error);
-    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to update order',
+        message: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -39,8 +46,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { id } = await params;
     await prisma.assetOrder.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting order:', error);
-    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to delete order',
+        message: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }

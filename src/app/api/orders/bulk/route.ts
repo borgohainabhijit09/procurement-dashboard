@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const orders = await request.json();
     
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return NextResponse.json({ error: 'No orders provided in request' }, { status: 400 });
+    }
+
     // Using transaction for bulk upsert
     const results = await prisma.$transaction(
       orders.map((order: any) => 
@@ -47,8 +51,15 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json({ success: true, count: results.length });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in bulk upload:', error);
-    return NextResponse.json({ error: 'Failed to upload bulk orders' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to upload bulk orders',
+        message: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }

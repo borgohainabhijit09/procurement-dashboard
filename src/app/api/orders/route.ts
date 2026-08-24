@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +17,16 @@ export async function GET(request: Request) {
 
     const orders = await prisma.assetOrder.findMany({ where });
     return NextResponse.json(orders);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching orders:', error);
-    return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch orders',
+        message: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -46,8 +51,15 @@ export async function POST(request: Request) {
       },
     });
     return NextResponse.json(newOrder, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating order:', error);
-    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to create order',
+        message: error?.message || String(error),
+        code: error?.code,
+      },
+      { status: 500 }
+    );
   }
 }

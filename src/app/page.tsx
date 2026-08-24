@@ -231,7 +231,8 @@ export default function Home() {
                           alert('Data uploaded successfully!');
                           window.location.reload();
                         } else {
-                          alert('Failed to upload data.');
+                          const errJson = await res.json().catch(() => ({}));
+                          alert(`Failed to upload data: ${errJson.message || errJson.error || res.statusText}`);
                         }
                       } catch (err) {
                         console.error(err);
