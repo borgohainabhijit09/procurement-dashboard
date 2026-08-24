@@ -41,8 +41,16 @@ export default function Home() {
     fetch('/api/orders')
       .then(r => r.json())
       .then(data => {
-        setAllData(data);
-        setOrders(data);
+        if (Array.isArray(data)) {
+          setAllData(data);
+          setOrders(data);
+        } else {
+          console.error("API returned an error or non-array:", data);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch orders:", err);
         setLoading(false);
       });
   }, []);
@@ -59,7 +67,9 @@ export default function Home() {
     fetch(`/api/orders?${queryParams.toString()}`)
       .then(r => r.json())
       .then(data => {
-        setOrders(data);
+        if (Array.isArray(data)) {
+          setOrders(data);
+        }
         setLoading(false);
       });
   }, [regionFilter, countryFilter, statusFilter, allData.length]);
