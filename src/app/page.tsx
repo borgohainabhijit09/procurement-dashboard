@@ -284,7 +284,7 @@ export default function Home() {
                     dataKey="value" 
                     fill="#3b82f6" 
                     radius={[4, 4, 0, 0]} 
-                    onClick={(data) => setRegionFilter(data.name)} // Interactive chart filtering!
+                    onClick={(data) => setRegionFilter(String(data?.name || ''))} // Interactive chart filtering!
                     className="cursor-pointer"
                   />
                 </BarChart>
@@ -306,7 +306,7 @@ export default function Home() {
                     outerRadius={100}
                     paddingAngle={5}
                     dataKey="value"
-                    onClick={(data) => setStatusFilter(data.name)} // Interactive chart filtering!
+                    onClick={(data) => setStatusFilter(String(data?.name || ''))} // Interactive chart filtering!
                     className="cursor-pointer"
                   >
                     {statusChartData.map((entry, index) => (
