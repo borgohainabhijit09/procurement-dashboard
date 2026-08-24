@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model AssetOrder {
+  id            String    @id
+  bundle        Int?
+  region        String
+  country       String
+  model         String
+  quantity      Int       @default(0)
+  inProgress    Int       @default(0)
+  ordered       Int       @default(0)
+  inTransit     Int       @default(0)
+  delivered     Int       @default(0)
+  toBeOrdered   Int       @default(0)
+  status        String?
+  lastUpdatedBy String?
+  lastUpdatedOn DateTime? @default(now())
+}
