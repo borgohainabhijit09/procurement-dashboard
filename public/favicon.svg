@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#003399"/>
+  <g transform="translate(32,32)">
+    <!-- Shield -->
+    <path d="M0-22 L18-12 L18,6 C18,16 0,24 0,24 C0,24 -18,16 -18,6 L-18,-12 Z" fill="#0B5ED7" stroke="white" stroke-width="1.5"/>
+    <!-- Stars -->
+    <circle cx="-7" cy="-2" r="2.2" fill="white"/>
+    <circle cx="0" cy="-8" r="2.2" fill="white"/>
+    <circle cx="7" cy="-2" r="2.2" fill="white"/>
+    <circle cx="-4" cy="5" r="2.2" fill="white"/>
+    <circle cx="4" cy="5" r="2.2" fill="white"/>
+  </g>
+</svg>

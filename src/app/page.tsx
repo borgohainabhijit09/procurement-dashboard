@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Package, Truck, CheckCircle, Activity, X, Pencil, Trash2, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Download, ChevronRight, ChevronDown, Plus, Wallet, TrendingDown, TrendingUp, Percent, Inbox } from 'lucide-react';
+import { Package, Truck, CheckCircle, Activity, X, Pencil, Trash2, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Download, ChevronRight, ChevronDown, Plus, Wallet, TrendingDown, TrendingUp, Percent, Inbox, Search, Columns3, ArrowRight, Printer, AlertTriangle, Keyboard } from 'lucide-react';
 import { utils, write } from 'xlsx';
 import { useToast } from '@/components/Toast';
 import { SkeletonCard, SkeletonTable } from '@/components/Skeleton';
@@ -49,6 +49,26 @@ const STATUS_OPTIONS = ['Pending', 'In Progress', 'Ordered', 'Partially Delivere
 const SLOT_STATUS_OPTIONS = ['Pending', 'Ordered', 'In Transit', 'Delivered'];
 const PERIOD_OPTIONS = ['H1-2025', 'H2-2025', 'H1-2026', 'H2-2026', 'H1-2027', 'H2-2027'];
 
+const STATUS_TRANSITIONS: Record<string, string> = {
+  'Pending': 'In Progress',
+  'In Progress': 'Ordered',
+  'Ordered': 'Partially Delivered',
+  'Partially Delivered': 'Completed',
+};
+
+const ALL_COLUMNS: { key: SortKey; label: string; align: string }[] = [
+  { key: 'region', label: 'Region', align: '' },
+  { key: 'country', label: 'Country', align: '' },
+  { key: 'model', label: 'Model', align: '' },
+  { key: 'quantity', label: 'Qty', align: 'text-right' },
+  { key: 'ordered', label: 'Ordered', align: 'text-right' },
+  { key: 'inTransit', label: 'In Transit', align: 'text-right' },
+  { key: 'earliestEta', label: 'ETA', align: '' },
+  { key: 'pending', label: 'Pending', align: 'text-right' },
+  { key: 'delivered', label: 'Delivered', align: 'text-right' },
+  { key: 'status', label: 'Status', align: '' },
+];
+
 type BudgetSummaryItem = {
   country: string;
   approved: number;
@@ -84,6 +104,20 @@ export default function Home() {
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummaryResponse | null>(null);
   const { toast } = useToast();
 
+  // Feature 1: Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Feature 2: Column visibility
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(ALL_COLUMNS.map(c => c.key)));
+  const [showColDropdown, setShowColDropdown] = useState(false);
+  const colDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Feature 5: Keyboard shortcuts
+  const [focusedRowIndex, setFocusedRowIndex] = useState(-1);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
   const fetchData = (period?: string) => {
     const p = period || periodFilter;
     fetch(`/api/orders?period=${encodeURIComponent(p)}`)
@@ -104,10 +138,12 @@ export default function Home() {
   useEffect(() => { fetchData(); }, []);
 
   const orders = useMemo(() => {
+    const sq = searchQuery.toLowerCase().trim();
     const filtered = allData.filter(o => {
       if (regionFilter && o.region !== regionFilter) return false;
       if (countryFilter && o.country !== countryFilter) return false;
       if (statusFilter && o.status !== statusFilter) return false;
+      if (sq && !o.model.toLowerCase().includes(sq) && !o.country.toLowerCase().includes(sq) && !o.region.toLowerCase().includes(sq) && !o.id.toLowerCase().includes(sq) && !String(o.bundle).includes(sq)) return false;
       return true;
     });
     const getVal = (o: AssetOrder) => {
@@ -123,7 +159,27 @@ export default function Home() {
       const bStr = String(bv ?? '');
       return sortDir === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
     });
-  }, [allData, regionFilter, countryFilter, statusFilter, sortKey, sortDir]);
+  }, [allData, regionFilter, countryFilter, statusFilter, searchQuery, sortKey, sortDir]);
+
+  // Feature 3: Advance status
+  const advanceOrderStatus = async (order: AssetOrder) => {
+    const nextStatus = STATUS_TRANSITIONS[order.status || 'Pending'];
+    if (!nextStatus) return;
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...order, status: nextStatus }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setAllData(prev => prev.map(o => o.id === updated.id ? { ...updated, slots: o.slots } : o));
+        toast(`Status moved to ${nextStatus}`);
+      } else toast('Failed to update status', 'error');
+    } catch {
+      toast('Failed to update status', 'error');
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -141,6 +197,84 @@ export default function Home() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.size === 0) return prev;
+      return next;
+    });
+  };
+
+  // Feature 5: Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        setTab('orders');
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setShowColDropdown(false);
+        setShowShortcutsHelp(false);
+        setEditingOrder(null);
+        setSlotModal(null);
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.key === 'e' && tab === 'orders') {
+        e.preventDefault();
+        exportToExcel();
+        return;
+      }
+
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShowShortcutsHelp(prev => !prev);
+        return;
+      }
+
+      if (tab === 'orders') {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setFocusedRowIndex(prev => Math.min(prev + 1, orders.length - 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setFocusedRowIndex(prev => Math.max(prev - 1, 0));
+        } else if (e.key === 'Enter' && focusedRowIndex >= 0 && focusedRowIndex < orders.length) {
+          e.preventDefault();
+          toggleRow(orders[focusedRowIndex].id);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [tab, orders, focusedRowIndex]);
+
+  // Close column dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (colDropdownRef.current && !colDropdownRef.current.contains(e.target as Node)) setShowColDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Reset focused row when data changes
+  useEffect(() => { setFocusedRowIndex(-1); }, [orders]);
+
+  // Feature 6: Print budget summary
+  const printBudgetSummary = () => {
+    window.print();
   };
 
   const exportToExcel = () => {
@@ -326,12 +460,17 @@ export default function Home() {
 
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
 
+  const alertCountries = useMemo(() => {
+    if (!filteredBudgetSummary) return [];
+    return filteredBudgetSummary.summary.filter(s => s.totalAvailable > 0 && (s.spent / s.totalAvailable) >= 0.8);
+  }, [filteredBudgetSummary]);
+
   return (
     <div className="min-h-screen text-slate-900 font-sans">
       <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4 pt-14 lg:pt-4">
 
         {/* Filter Bar */}
-        <div className="bg-[#003399] rounded-lg shadow-sm px-5 py-3">
+        <div className="bg-[#003399] rounded-lg shadow-sm px-5 py-3 no-print">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-bold text-white tracking-tight leading-tight">Asset Ordering</h1>
@@ -365,7 +504,7 @@ export default function Home() {
                   {PERIOD_OPTIONS.map(p => <option key={p} value={p} className="text-gray-900">{p}</option>)}
                 </select>
               </div>
-              <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="px-3 py-1.5 text-sm text-white bg-white/10 hover:bg-white/20 rounded-md transition-colors flex items-center gap-1.5">
+              <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); setSearchQuery(''); }} className="px-3 py-1.5 text-sm text-white bg-white/10 hover:bg-white/20 rounded-md transition-colors flex items-center gap-1.5">
                 <RotateCcw size={13} /> Clear
               </button>
             </div>
@@ -373,7 +512,7 @@ export default function Home() {
         </div>
 
         {/* Tab Bar */}
-        <div className="flex gap-1 bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+        <div className="flex gap-1 bg-white rounded-lg shadow-sm border border-gray-200 p-1 no-print">
           {([
             { key: 'dashboard' as const, label: 'Dashboard' },
             { key: 'orders' as const, label: 'Orders' },
@@ -394,6 +533,20 @@ export default function Home() {
 
         {/* === Dashboard Tab === */}
         {tab === 'dashboard' && (<>
+
+        {/* Budget Alerts Banner */}
+        {alertCountries.length > 0 && (
+          <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 flex items-start gap-3 no-print">
+            <AlertTriangle size={18} className="text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Budget Alert — {alertCountries.length} {alertCountries.length === 1 ? 'country' : 'countries'} above 80% utilization</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                {alertCountries.map(c => `${c.country} (${Math.round((c.spent / c.totalAvailable) * 100)}%)`).join(', ')}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* KPIs */}
         {loading && allData.length === 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -471,20 +624,31 @@ export default function Home() {
 
         {/* Budget vs Actual */}
         {filteredBudgetSummary && filteredBudgetSummary.summary.length > 0 && (
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200" id="budget-summary">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-gray-700">Budget Overview — {filteredBudgetSummary.period}</h3>
                 {filteredBudgetSummary.totals.carryover > 0 && (
                   <p className="text-[10px] text-emerald-600 mt-0.5">
-                    +€{filteredBudgetSummary.totals.carryover.toLocaleString()} savings carried over from {filteredBudgetSummary.previousPeriod}
+                    +\u20AC{filteredBudgetSummary.totals.carryover.toLocaleString()} savings carried over from {filteredBudgetSummary.previousPeriod}
                   </p>
                 )}
               </div>
-              <div className="text-right">
-                <p className="text-[10px] text-gray-400 uppercase">Total Utilization</p>
-                <p className="text-lg font-bold text-gray-900">{filteredBudgetSummary.totals.utilization}%</p>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-[10px] text-gray-400 uppercase">Total Utilization</p>
+                  <p className="text-lg font-bold text-gray-900">{filteredBudgetSummary.totals.utilization}%</p>
+                </div>
+                <button onClick={printBudgetSummary} className="no-print px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-1.5" title="Print budget summary">
+                  <Printer size={13} /> Print
+                </button>
               </div>
+            </div>
+
+            {/* Print header - only visible when printing */}
+            <div className="print-only mb-4 border-b border-gray-300 pb-3">
+              <h2 className="text-lg font-bold text-[#003399]">Philips DEX — Half-Year Budget Summary</h2>
+              <p className="text-sm text-gray-600">Period: {filteredBudgetSummary.period} | Generated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
 
             {/* Country cards */}
@@ -492,13 +656,19 @@ export default function Home() {
               {filteredBudgetSummary.summary.map(item => {
                 const pct = item.totalAvailable > 0 ? Math.round((item.spent / item.totalAvailable) * 100) : 0;
                 const barColor = pct > 90 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-[#0B5ED7]';
+                const isAlert = pct >= 80;
                 return (
-                  <div key={item.country} className="border border-gray-100 rounded-lg p-3 space-y-2 hover:border-gray-200 transition-colors">
+                  <div key={item.country} className={`border rounded-lg p-3 space-y-2 transition-colors print-budget-card ${
+                    isAlert ? 'border-red-300 bg-red-50/50 shadow-sm shadow-red-100' : 'border-gray-100 hover:border-gray-200'
+                  }`}>
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-semibold text-gray-700">{item.country}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        pct > 90 ? 'bg-red-50 text-red-700' : pct > 70 ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-[#0B5ED7]'
-                      }`}>{pct}%</span>
+                      <div className="flex items-center gap-1.5">
+                        {isAlert && <AlertTriangle size={11} className="text-red-500" />}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          pct > 90 ? 'bg-red-50 text-red-700' : pct > 70 ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-[#0B5ED7]'
+                        }`}>{pct}%</span>
+                      </div>
                     </div>
 
                     {/* Progress bar */}
@@ -510,28 +680,28 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Budget</span>
-                        <span className="font-medium text-gray-600">€{item.approved.toLocaleString()}</span>
+                        <span className="font-medium text-gray-600">\u20AC{item.approved.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Spent</span>
-                        <span className="font-medium text-amber-600">€{item.spent.toLocaleString()}</span>
+                        <span className="font-medium text-amber-600">\u20AC{item.spent.toLocaleString()}</span>
                       </div>
                       {item.carryover > 0 && (
                         <>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Carryover</span>
-                            <span className="font-medium text-emerald-600">+€{item.carryover.toLocaleString()}</span>
+                            <span className="font-medium text-emerald-600">+\u20AC{item.carryover.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Available</span>
-                            <span className="font-medium text-gray-700">€{item.totalAvailable.toLocaleString()}</span>
+                            <span className="font-medium text-gray-700">\u20AC{item.totalAvailable.toLocaleString()}</span>
                           </div>
                         </>
                       )}
                       <div className="flex justify-between col-span-2">
                         <span className="text-gray-400">Remaining</span>
                         <span className={`font-semibold ${item.remaining > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          €{item.remaining.toLocaleString()}
+                          \u20AC{item.remaining.toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -545,11 +715,84 @@ export default function Home() {
 
         {/* === Orders Tab === */}
         {tab === 'orders' && (<>
-        <div className="flex justify-end">
-          <button onClick={exportToExcel} disabled={orders.length === 0} className="px-3 py-1.5 text-sm bg-[#00B050] hover:bg-[#00913F] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md shadow-sm transition-colors flex items-center gap-1.5">
-            <Download size={13} /> Export Excel
-          </button>
+        <div className="flex justify-between items-center gap-3 flex-wrap">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search model, country, ID... (Ctrl+K)"
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none bg-white shadow-sm"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Column visibility dropdown */}
+            <div className="relative" ref={colDropdownRef}>
+              <button onClick={() => setShowColDropdown(!showColDropdown)} className="px-2.5 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-md shadow-sm transition-colors flex items-center gap-1.5" title="Toggle columns">
+                <Columns3 size={13} /> Columns
+              </button>
+              {showColDropdown && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 p-2 min-w-[180px]">
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold px-2 py-1">Visible Columns</p>
+                  {ALL_COLUMNS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.has(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        className="rounded border-gray-300 text-[#0B5ED7] focus:ring-[#0B5ED7]"
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Shortcuts hint */}
+            <button onClick={() => setShowShortcutsHelp(!showShortcutsHelp)} className="no-print px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors" title="Keyboard shortcuts">
+              <Keyboard size={14} />
+            </button>
+
+            <button onClick={exportToExcel} disabled={orders.length === 0} className="px-3 py-1.5 text-sm bg-[#00B050] hover:bg-[#00913F] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md shadow-sm transition-colors flex items-center gap-1.5">
+              <Download size={13} /> Export
+            </button>
+          </div>
         </div>
+
+        {/* Keyboard shortcuts help panel */}
+        {showShortcutsHelp && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 no-print">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Keyboard Shortcuts</h4>
+              <button onClick={() => setShowShortcutsHelp(false)} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              {[
+                { keys: 'Ctrl+K', desc: 'Focus search' },
+                { keys: 'E', desc: 'Export Excel' },
+                { keys: '↑ ↓', desc: 'Navigate rows' },
+                { keys: 'Enter', desc: 'Expand/collapse row' },
+                { keys: '?', desc: 'Toggle this help' },
+                { keys: 'Esc', desc: 'Close modals' },
+              ].map(s => (
+                <div key={s.keys} className="flex items-center gap-2">
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] font-mono text-gray-600 shadow-sm">{s.keys}</kbd>
+                  <span className="text-gray-500">{s.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Data Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -561,86 +804,88 @@ export default function Home() {
             <EmptyState
               icon={Inbox}
               title="No orders found"
-              description={regionFilter || countryFilter || statusFilter ? 'Try adjusting your filters to see more results.' : 'No asset orders have been created yet.'}
-              action={!regionFilter && !countryFilter && !statusFilter ? (
+              description={regionFilter || countryFilter || statusFilter || searchQuery ? 'Try adjusting your filters or search to see more results.' : 'No asset orders have been created yet.'}
+              action={(!regionFilter && !countryFilter && !statusFilter && !searchQuery) ? (
                 <p className="text-xs text-gray-400">Orders will appear here once added through the API or seed script.</p>
               ) : (
-                <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="text-xs text-[#0B5ED7] hover:underline">Clear all filters</button>
+                <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); setSearchQuery(''); }} className="text-xs text-[#0B5ED7] hover:underline">Clear all filters</button>
               )}
             />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" ref={tableContainerRef}>
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 text-[10px] uppercase tracking-wider">
                     <th className="px-2 py-2 border-b border-gray-100 w-6" />
-                    {[
-                      { key: 'region' as SortKey, label: 'Region', align: '' },
-                      { key: 'country' as SortKey, label: 'Country', align: '' },
-                      { key: 'model' as SortKey, label: 'Model', align: '' },
-                      { key: 'quantity' as SortKey, label: 'Qty', align: 'text-right' },
-                      { key: 'ordered' as SortKey, label: 'Ordered', align: 'text-right' },
-                      { key: 'inTransit' as SortKey, label: 'In Transit', align: 'text-right' },
-                      { key: 'earliestEta' as SortKey, label: 'ETA', align: '' },
-                      { key: 'pending' as SortKey, label: 'Pending', align: 'text-right' },
-                      { key: 'delivered' as SortKey, label: 'Delivered', align: 'text-right' },
-                      { key: 'status' as SortKey, label: 'Status', align: '' },
-                    ].map(col => (
+                    {ALL_COLUMNS.filter(col => visibleColumns.has(col.key)).map(col => (
                       <th key={col.key} onClick={() => handleSort(col.key)} className={`px-3 py-2 font-semibold border-b border-gray-100 cursor-pointer hover:bg-gray-100 select-none transition-colors ${col.align}`}>
                         <span className="inline-flex items-center gap-0.5">{col.label}<SortIcon col={col.key} /></span>
                       </th>
                     ))}
-                    <th className="px-3 py-2 font-semibold border-b border-gray-100 text-center w-20">Actions</th>
+                    <th className="px-3 py-2 font-semibold border-b border-gray-100 text-center w-24">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {orders.map(order => {
+                  {orders.map((order, idx) => {
                     const pending = Math.max(0, Number(order.quantity) - Number(order.ordered));
                     const isExpanded = expandedRows.has(order.id);
+                    const isFocused = idx === focusedRowIndex;
+                    const nextStatus = STATUS_TRANSITIONS[order.status || 'Pending'];
                     return (
-                      <>
-                        <tr key={order.id} className="hover:bg-[#E8F0FE]/40 transition-colors">
+                      <Fragment key={order.id}>
+                        <tr className={`transition-colors ${isFocused ? 'bg-[#E8F0FE]' : 'hover:bg-[#E8F0FE]/40'}`}>
                           <td className="px-2 py-1.5 text-center">
                             <button onClick={() => toggleRow(order.id)} className="text-gray-400 hover:text-[#0B5ED7]">
                               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                             </button>
                           </td>
-                          <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{order.region}</td>
-                          <td className="px-3 py-1.5 text-xs text-gray-600">{order.country}</td>
-                          <td className="px-3 py-1.5 text-xs text-gray-600">{order.model}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-medium text-gray-700">{order.quantity.toLocaleString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-semibold text-[#0B5ED7]">{order.ordered.toLocaleString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{order.inTransit.toLocaleString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-gray-500">{formatDate(order.earliestEta)}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{pending.toLocaleString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-right font-semibold text-emerald-600">{order.delivered.toLocaleString()}</td>
-                          <td className="px-3 py-1.5">
-                            <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full leading-relaxed
-                              ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                                order.status === 'In Progress' ? 'bg-[#E0EBFA] text-[#0840A0]' :
-                                order.status === 'Ordered' ? 'bg-purple-100 text-purple-700' :
-                                order.status === 'Partially Delivered' ? 'bg-amber-100 text-amber-700' :
-                                'bg-gray-100 text-gray-600'}`}>
-                              {order.status || 'N/A'}
-                            </span>
-                          </td>
+                          {visibleColumns.has('region') && <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{order.region}</td>}
+                          {visibleColumns.has('country') && <td className="px-3 py-1.5 text-xs text-gray-600">{order.country}</td>}
+                          {visibleColumns.has('model') && <td className="px-3 py-1.5 text-xs text-gray-600">{order.model}</td>}
+                          {visibleColumns.has('quantity') && <td className="px-3 py-1.5 text-xs text-right font-medium text-gray-700">{order.quantity.toLocaleString()}</td>}
+                          {visibleColumns.has('ordered') && <td className="px-3 py-1.5 text-xs text-right font-semibold text-[#0B5ED7]">{order.ordered.toLocaleString()}</td>}
+                          {visibleColumns.has('inTransit') && <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{order.inTransit.toLocaleString()}</td>}
+                          {visibleColumns.has('earliestEta') && <td className="px-3 py-1.5 text-xs text-gray-500">{formatDate(order.earliestEta)}</td>}
+                          {visibleColumns.has('pending') && <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{pending.toLocaleString()}</td>}
+                          {visibleColumns.has('delivered') && <td className="px-3 py-1.5 text-xs text-right font-semibold text-emerald-600">{order.delivered.toLocaleString()}</td>}
+                          {visibleColumns.has('status') && (
+                            <td className="px-3 py-1.5">
+                              <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full leading-relaxed
+                                ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                                  order.status === 'In Progress' ? 'bg-[#E0EBFA] text-[#0840A0]' :
+                                  order.status === 'Ordered' ? 'bg-purple-100 text-purple-700' :
+                                  order.status === 'Partially Delivered' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-gray-100 text-gray-600'}`}>
+                                {order.status || 'N/A'}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-3 py-1.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-0.5">
+                              {nextStatus && (
+                                <button
+                                  onClick={() => advanceOrderStatus(order)}
+                                  className="p-1.5 text-gray-400 hover:text-[#0B5ED7] hover:bg-[#E8F0FE] rounded transition-colors group relative"
+                                  title={`Move to ${nextStatus}`}
+                                >
+                                  <ArrowRight size={13} />
+                                </button>
+                              )}
                               <button onClick={() => openAddSlot(order)} className="p-1.5 text-gray-400 hover:text-[#00B050] hover:bg-emerald-50 rounded transition-colors" title="Add Slot">
-                                <Plus size={14} />
+                                <Plus size={13} />
                               </button>
                               <button onClick={() => setEditingOrder(order)} className="p-1.5 text-gray-400 hover:text-[#0B5ED7] hover:bg-[#E8F0FE] rounded transition-colors" title="Edit">
-                                <Pencil size={14} />
+                                <Pencil size={13} />
                               </button>
                               <button onClick={() => deleteOrder(order.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
-                                <Trash2 size={14} />
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr key={`${order.id}-slots`}>
-                            <td colSpan={11} className="px-4 py-2 bg-gray-50/50">
+                          <tr>
+                            <td colSpan={ALL_COLUMNS.filter(col => visibleColumns.has(col.key)).length + 2} className="px-4 py-2 bg-gray-50/50">
                               {order.slots.length === 0 ? (
                                 <p className="text-xs text-gray-400 py-2">No order slots yet. Click + to add one.</p>
                               ) : (
@@ -672,7 +917,7 @@ export default function Home() {
                                             {slot.status || 'Pending'}
                                           </span>
                                         </td>
-                                        <td className="py-1 px-2 text-right text-gray-600">{slot.pricePerUnit ? `€${Number(slot.pricePerUnit).toLocaleString()}` : '--'}</td>
+                                        <td className="py-1 px-2 text-right text-gray-600">{slot.pricePerUnit ? `\u20AC${Number(slot.pricePerUnit).toLocaleString()}` : '--'}</td>
                                         <td className="py-1 px-2 text-right">
                                           <button onClick={() => openEditSlot(order, slot)} className="text-gray-400 hover:text-[#0B5ED7] mr-1"><Pencil size={11} /></button>
                                           <button onClick={() => deleteSlot(slot.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={11} /></button>
@@ -685,16 +930,16 @@ export default function Home() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="p-10 text-center text-gray-400 text-sm">
+                      <td colSpan={ALL_COLUMNS.filter(col => visibleColumns.has(col.key)).length + 2} className="p-10 text-center text-gray-400 text-sm">
                         <div className="flex flex-col items-center">
                           <Inbox size={24} className="mb-2 text-gray-300" />
                           <p>No orders match the current filters.</p>
-                          <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="text-xs text-[#0B5ED7] hover:underline mt-1">Clear filters</button>
+                          <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); setSearchQuery(''); }} className="text-xs text-[#0B5ED7] hover:underline mt-1">Clear filters</button>
                         </div>
                       </td>
                     </tr>

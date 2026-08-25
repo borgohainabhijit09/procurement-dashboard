@@ -49,3 +49,15 @@ body {
     padding-right: 0.5rem;
   }
 }
+
+@media print {
+  body { background: white !important; }
+  .no-print, nav, .print-hidden { display: none !important; }
+  .print-only { display: block !important; }
+  .print-break { page-break-before: always; }
+  .print-budget-card { border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; }
+  .max-w-\[1400px\] { max-width: 100% !important; padding: 0 !important; }
+  .bg-\[\#003399\] { background: #003399 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+.print-only { display: none; }
