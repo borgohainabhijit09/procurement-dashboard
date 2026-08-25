@@ -171,19 +171,15 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f6f8] text-slate-900 font-sans">
-      <div className="h-1 bg-[#003399]" />
-      <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4">
+    <div className="min-h-screen text-slate-900 font-sans">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4 pt-14 lg:pt-4">
 
-        {/* Header */}
-        <header className="bg-[#003399] rounded-lg shadow-sm px-5 py-3">
+        {/* Filter Bar */}
+        <div className="bg-[#003399] rounded-lg shadow-sm px-5 py-3">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="Philips" className="h-8 w-auto" />
-              <div>
-                <h1 className="text-lg font-bold text-white tracking-tight leading-tight">Asset Ordering DEX</h1>
-                <p className="text-[11px] text-blue-200">Region & country-wise tracking</p>
-              </div>
+              <h1 className="text-lg font-bold text-white tracking-tight leading-tight">Asset Ordering</h1>
+              <p className="text-[11px] text-blue-200 hidden sm:block">Region & country-wise tracking</p>
             </div>
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex flex-col">
@@ -215,7 +211,7 @@ export default function Home() {
               </button>
             </div>
           </div>
-        </header>
+        </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -398,11 +394,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="mt-6 pb-4 text-center">
-        <p className="text-[10px] text-gray-400">Philips DEX &middot; Asset Ordering Internal Tool &middot; {new Date().getFullYear()}</p>
-      </footer>
-    </main>
+    </div>
   );
 }
