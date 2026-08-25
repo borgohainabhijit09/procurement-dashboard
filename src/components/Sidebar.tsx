@@ -48,13 +48,13 @@ export default function Sidebar() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={`px-4 py-4 border-b border-white/10 ${collapsed ? 'px-2' : ''}`}>
-        <Link href="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="Philips" className={`w-auto transition-all ${collapsed ? 'h-6 mx-auto' : 'h-7'}`} />
+        <Link href="/" className={`flex flex-col items-center gap-1 ${collapsed ? '' : 'items-start'}`}>
+          <img src="/logo.png" alt="Philips" className={`w-auto transition-all ${collapsed ? 'h-6' : 'h-7'}`} />
           {!collapsed && (
-            <div>
+            <>
               <h2 className="text-sm font-bold text-white leading-tight">DEX Portal</h2>
               <p className="text-[9px] text-blue-300">Digital Experience</p>
-            </div>
+            </>
           )}
         </Link>
       </div>
