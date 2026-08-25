@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Package, Truck, CheckCircle, Activity, X } from 'lucide-react';
+import { Package, Truck, CheckCircle, Activity, X, Pencil, Trash2, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { utils, write } from 'xlsx';
 
 type AssetOrder = {
   id: string;
@@ -21,111 +22,128 @@ type AssetOrder = {
   lastUpdatedOn: string;
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+const STATUS_OPTIONS = ['Pending', 'In Progress', 'Ordered', 'Partially Delivered', 'Completed'];
 
 export default function Home() {
   const [allData, setAllData] = useState<AssetOrder[]>([]);
-  const [orders, setOrders] = useState<AssetOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Filters
   const [regionFilter, setRegionFilter] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  
-  // Edit Modal State
   const [editingOrder, setEditingOrder] = useState<AssetOrder | null>(null);
+  const [sortKey, setSortKey] = useState<keyof AssetOrder | 'pending'>('region');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  // Fetch all data once for extracting global filter options and maybe dashboard base data
   useEffect(() => {
     fetch('/api/orders')
       .then(r => r.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setAllData(data);
-          setOrders(data);
-        } else {
-          console.error("API returned an error or non-array:", data);
-        }
+        if (Array.isArray(data)) setAllData(data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("Failed to fetch orders:", err);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, []);
 
-  // Fetch filtered data when filters change
-  useEffect(() => {
-    if (allData.length === 0) return;
-    setLoading(true);
-    const queryParams = new URLSearchParams();
-    if (regionFilter) queryParams.append('region', regionFilter);
-    if (countryFilter) queryParams.append('country', countryFilter);
-    if (statusFilter) queryParams.append('status', statusFilter);
-    
-    fetch(`/api/orders?${queryParams.toString()}`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setOrders(data);
-        }
-        setLoading(false);
-      });
-  }, [regionFilter, countryFilter, statusFilter, allData.length]);
+  const orders = useMemo(() => {
+    const filtered = allData.filter(o => {
+      if (regionFilter && o.region !== regionFilter) return false;
+      if (countryFilter && o.country !== countryFilter) return false;
+      if (statusFilter && o.status !== statusFilter) return false;
+      return true;
+    });
+    const getVal = (o: AssetOrder) => {
+      if (sortKey === 'pending') return Math.max(0, o.quantity - o.ordered);
+      return o[sortKey];
+    };
+    return [...filtered].sort((a, b) => {
+      const av = getVal(a);
+      const bv = getVal(b);
+      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av;
+      const aStr = String(av ?? '');
+      const bStr = String(bv ?? '');
+      return sortDir === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+  }, [allData, regionFilter, countryFilter, statusFilter, sortKey, sortDir]);
 
-  // Dependent Filters Logic
+  const handleSort = (key: keyof AssetOrder | 'pending') => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ col }: { col: keyof AssetOrder | 'pending' }) => {
+    if (sortKey !== col) return <ArrowUpDown size={11} className="text-gray-300 ml-0.5" />;
+    return sortDir === 'asc' ? <ArrowUp size={11} className="text-blue-600 ml-0.5" /> : <ArrowDown size={11} className="text-blue-600 ml-0.5" />;
+  };
+
+  const exportToExcel = () => {
+    const data = orders.map(o => ({
+      Region: o.region, Country: o.country, Model: o.model,
+      Qty: o.quantity, Ordered: o.ordered, 'Pending Qty': Math.max(0, o.quantity - o.ordered),
+      Delivered: o.delivered, Status: o.status || '',
+    }));
+    const ws = utils.json_to_sheet(data);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Orders');
+    const colWidths = Object.keys(data[0] || {}).map(k => ({ wch: Math.max(k.length, ...data.map(r => String((r as Record<string, unknown>)[k] ?? '').length)) + 2 }));
+    ws['!cols'] = colWidths;
+    const buf = write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buf], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `asset-orders-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
   const regions = useMemo(() => Array.from(new Set(allData.map(o => o.region))).sort(), [allData]);
   const countries = useMemo(() => {
-    const filteredByRegion = regionFilter ? allData.filter(o => o.region === regionFilter) : allData;
-    return Array.from(new Set(filteredByRegion.map(o => o.country))).sort();
+    const filtered = regionFilter ? allData.filter(o => o.region === regionFilter) : allData;
+    return Array.from(new Set(filtered.map(o => o.country))).sort();
   }, [allData, regionFilter]);
-  
   const statuses = useMemo(() => Array.from(new Set(allData.map(o => o.status || 'Unknown'))).sort(), [allData]);
 
-  // Reset country filter if the selected country is not in the updated dependent list
-  useEffect(() => {
-    if (countryFilter && !countries.includes(countryFilter)) {
-      setCountryFilter('');
+  const handleRegionChange = (value: string) => {
+    setRegionFilter(value);
+    if (value) {
+      const validCountries = Array.from(new Set(
+        allData.filter(o => o.region === value).map(o => o.country)
+      ));
+      if (countryFilter && !validCountries.includes(countryFilter)) {
+        setCountryFilter('');
+      }
     }
-  }, [countries, countryFilter]);
+  };
 
-  // KPI Calculations (based on currently filtered orders)
-  const kpis = useMemo(() => {
-    return {
-      totalOrdered: orders.reduce((sum, o) => sum + o.ordered, 0),
-      totalDelivered: orders.reduce((sum, o) => sum + o.delivered, 0),
-      totalInProgress: orders.reduce((sum, o) => sum + o.inProgress, 0),
-      totalInTransit: orders.reduce((sum, o) => sum + o.inTransit, 0),
-    };
-  }, [orders]);
+  const kpis = useMemo(() => ({
+    totalOrdered: orders.reduce((sum, o) => sum + o.ordered, 0),
+    totalDelivered: orders.reduce((sum, o) => sum + o.delivered, 0),
+    totalInProgress: orders.reduce((sum, o) => sum + o.inProgress, 0),
+    totalInTransit: orders.reduce((sum, o) => sum + o.inTransit, 0),
+  }), [orders]);
 
-  // Chart Data Calculations (using allData or orders? usually dashboard charts use global or partially filtered. Let's use orders so it reflects current drill-down)
   const regionChartData = useMemo(() => {
-    const map = new Map();
-    orders.forEach(o => {
-      map.set(o.region, (map.get(o.region) || 0) + o.ordered);
-    });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
+    const map = new Map<string, number>();
+    orders.forEach(o => map.set(o.region, (map.get(o.region) || 0) + o.ordered));
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [orders]);
 
   const statusChartData = useMemo(() => {
-    const map = new Map();
-    orders.forEach(o => {
-      const s = o.status || 'Unknown';
-      map.set(s, (map.get(s) || 0) + o.ordered);
-    });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+    const totalOrdered = orders.reduce((s, o) => s + o.ordered, 0);
+    const totalInTransit = orders.reduce((s, o) => s + o.inTransit, 0);
+    const totalDelivered = orders.reduce((s, o) => s + o.delivered, 0);
+    return [
+      { name: 'Ordered', value: totalOrdered },
+      { name: 'In Transit', value: totalInTransit },
+      { name: 'Delivered', value: totalDelivered },
+    ].filter(d => d.value > 0);
   }, [orders]);
 
   const deleteOrder = async (id: string) => {
     if (!confirm('Are you sure you want to delete this order?')) return;
     try {
       const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setAllData(prev => prev.filter(o => o.id !== id));
-        setOrders(prev => prev.filter(o => o.id !== id));
-      }
+      if (res.ok) setAllData(prev => prev.filter(o => o.id !== id));
     } catch (error) {
       console.error('Failed to delete order:', error);
     }
@@ -134,16 +152,17 @@ export default function Home() {
   const saveOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingOrder) return;
+    const pendingQty = editingOrder.quantity - editingOrder.ordered;
+    const payload = { ...editingOrder, toBeOrdered: pendingQty < 0 ? 0 : pendingQty };
     try {
       const res = await fetch(`/api/orders/${editingOrder.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingOrder)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         const updated = await res.json();
         setAllData(prev => prev.map(o => o.id === updated.id ? updated : o));
-        setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
         setEditingOrder(null);
       }
     } catch (error) {
@@ -152,237 +171,169 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-6 bg-slate-50 text-slate-900 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header & Filters */}
-        <header className="flex flex-col md:flex-row md:justify-between md:items-end bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Asset Ordering</h1>
-            <p className="text-sm text-slate-500 mt-1">Interactive region and country-wise tracking</p>
-          </div>
-          <div className="mt-4 md:mt-0 flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col">
-              <label className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Region</label>
-              <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)} className="px-3 py-2 border rounded-lg bg-slate-50 shadow-inner min-w-[150px]">
-                <option value="">All Regions</option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+    <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4">
+
+        {/* Header */}
+        <header className="bg-white rounded-lg shadow-sm border border-gray-200 px-5 py-3">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Package size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-tight">Asset Ordering Dashboard</h1>
+                <p className="text-xs text-gray-400">Region & country-wise tracking</p>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Country</label>
-              <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)} className="px-3 py-2 border rounded-lg bg-slate-50 shadow-inner min-w-[150px]" disabled={!regionFilter && countries.length > 20}>
-                <option value="">All Countries</option>
-                {countries.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col">
-              <label className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Status</label>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border rounded-lg bg-slate-50 shadow-inner min-w-[150px]">
-                <option value="">All Statuses</option>
-                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} 
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors font-medium"
-              >
-                Clear
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Region</label>
+                <select value={regionFilter} onChange={e => handleRegionChange(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]">
+                  <option value="">All Regions</option>
+                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col">
+                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Country</label>
+                <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]" disabled={!regionFilter && countries.length > 20}>
+                  <option value="">All Countries</option>
+                  {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col">
+                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Status</label>
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]">
+                  <option value="">All Statuses</option>
+                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-1.5">
+                <RotateCcw size={13} /> Clear
               </button>
-              <label className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium shadow-sm flex items-center">
-                <span className="mr-2">Upload Data</span>
-                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={async (e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    const file = e.target.files[0];
-                    const reader = new FileReader();
-                    reader.onload = async (event) => {
-                      try {
-                        setLoading(true);
-                        const { read, utils } = await import('xlsx');
-                        const workbook = read(event.target?.result, { type: 'binary' });
-                        const sheetName = workbook.SheetNames[0];
-                        const sheet = workbook.Sheets[sheetName];
-                        const rawData = utils.sheet_to_json(sheet);
-                        
-                        const formattedData = rawData.map((row: any) => ({
-                          id: row['ID '],
-                          bundle: row[' Bundle '] ? Number(row[' Bundle ']) : null,
-                          region: row[' Region '],
-                          country: row[' Country '],
-                          model: row[' Model '],
-                          quantity: Number(row[' Quantity ']) || 0,
-                          inProgress: Number(row[' InProgress ']) || 0,
-                          ordered: Number(row[' Ordered ']) || 0,
-                          inTransit: Number(row[' InTransit ']) || 0,
-                          delivered: Number(row[' Delivered ']) || 0,
-                          toBeOrdered: Number(row[' ToBeOrdered ']) || 0,
-                          status: row[' Status '] || null,
-                          lastUpdatedBy: row[' LastUpdatedBy '] || null,
-                        })).filter(row => row.id);
-
-                        const res = await fetch('/api/orders/bulk', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(formattedData)
-                        });
-
-                        if (res.ok) {
-                          alert('Data uploaded successfully!');
-                          window.location.reload();
-                        } else {
-                          const errJson = await res.json().catch(() => ({}));
-                          alert(`Failed to upload data: ${errJson.message || errJson.error || res.statusText}`);
-                        }
-                      } catch (err) {
-                        console.error(err);
-                        alert('Error processing file.');
-                      } finally {
-                        setLoading(false);
-                      }
-                    };
-                    reader.readAsBinaryString(file);
-                  }
-                }} />
-              </label>
+              <button onClick={exportToExcel} disabled={orders.length === 0} className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-colors flex items-center gap-1.5">
+                <Download size={13} /> Export Excel
+              </button>
             </div>
           </div>
         </header>
 
-        {/* Dashboard KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-lg"><Package size={24} /></div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Total Ordered</p>
-              <h3 className="text-2xl font-bold text-slate-800">{kpis.totalOrdered.toLocaleString()}</h3>
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Total Ordered', value: kpis.totalOrdered, icon: Package, bg: 'bg-blue-50', fg: 'text-blue-600' },
+            { label: 'Delivered', value: kpis.totalDelivered, icon: CheckCircle, bg: 'bg-emerald-50', fg: 'text-emerald-600' },
+            { label: 'In Transit', value: kpis.totalInTransit, icon: Truck, bg: 'bg-amber-50', fg: 'text-amber-600' },
+            { label: 'In Progress', value: kpis.totalInProgress, icon: Activity, bg: 'bg-purple-50', fg: 'text-purple-600' },
+          ].map(kpi => (
+            <div key={kpi.label} className="bg-white px-4 py-3 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
+              <div className={`p-2 rounded-md ${kpi.bg} ${kpi.fg}`}><kpi.icon size={18} /></div>
+              <div>
+                <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">{kpi.label}</p>
+                <p className="text-lg font-bold text-gray-900">{kpi.value.toLocaleString()}</p>
+              </div>
             </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="p-3 bg-green-100 text-green-600 rounded-lg"><CheckCircle size={24} /></div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Delivered</p>
-              <h3 className="text-2xl font-bold text-slate-800">{kpis.totalDelivered.toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="p-3 bg-amber-100 text-amber-600 rounded-lg"><Truck size={24} /></div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">In Transit</p>
-              <h3 className="text-2xl font-bold text-slate-800">{kpis.totalInTransit.toLocaleString()}</h3>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-            <div className="p-3 bg-purple-100 text-purple-600 rounded-lg"><Activity size={24} /></div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">In Progress</p>
-              <h3 className="text-2xl font-bold text-slate-800">{kpis.totalInProgress.toLocaleString()}</h3>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Orders by Region</h3>
-            <div className="h-72 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Orders by Region</h3>
+            <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={regionChartData}>
-                  <XAxis dataKey="name" tick={{fontSize: 12}} interval={0} />
-                  <YAxis />
-                  <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                  <Bar 
-                    dataKey="value" 
-                    fill="#3b82f6" 
-                    radius={[4, 4, 0, 0]} 
-                    onClick={(data) => setRegionFilter(String(data?.name || ''))} // Interactive chart filtering!
-                    className="cursor-pointer"
-                  />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[3, 3, 0, 0]} onClick={(data) => setRegionFilter(String(data?.name || ''))} className="cursor-pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-slate-400 text-center mt-2">Click a bar to filter by region</p>
+            <p className="text-[10px] text-gray-400 text-center mt-1">Click a bar to filter by region</p>
           </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Orders by Status</h3>
-            <div className="h-72 w-full">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Order Pipeline</h3>
+            <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={statusChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                    onClick={(data) => setStatusFilter(String(data?.name || ''))} // Interactive chart filtering!
-                    className="cursor-pointer"
-                  >
-                    {statusChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                  <Pie data={statusChartData} cx="50%" cy="50%" innerRadius={45} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    {statusChartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                  <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-slate-400 text-center mt-2">Click a slice to filter by status</p>
           </div>
         </div>
 
         {/* Data Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {loading && orders.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-              <Activity className="animate-spin mb-4 text-blue-500" size={32} />
-              Loading data...
+            <div className="p-10 text-center text-gray-400 flex flex-col items-center">
+              <Activity className="animate-spin mb-3 text-blue-500" size={24} />
+              <span className="text-sm">Loading data...</span>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-semibold border-b border-slate-100">Region / Country</th>
-                    <th className="p-4 font-semibold border-b border-slate-100">Model</th>
-                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Qty</th>
-                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Pending Qty</th>
-                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Ordered</th>
-                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Delivered</th>
-                    <th className="p-4 font-semibold border-b border-slate-100">Status</th>
-                    <th className="p-4 font-semibold border-b border-slate-100 text-right">Actions</th>
+                  <tr className="bg-gray-50 text-gray-500 text-[10px] uppercase tracking-wider">
+                    {[
+                      { key: 'region' as const, label: 'Region', align: '' },
+                      { key: 'country' as const, label: 'Country', align: '' },
+                      { key: 'model' as const, label: 'Model', align: '' },
+                      { key: 'quantity' as const, label: 'Qty', align: 'text-right' },
+                      { key: 'ordered' as const, label: 'Ordered', align: 'text-right' },
+                      { key: 'pending' as const, label: 'Pending Qty', align: 'text-right' },
+                      { key: 'delivered' as const, label: 'Delivered', align: 'text-right' },
+                      { key: 'status' as const, label: 'Status', align: '' },
+                    ].map(col => (
+                      <th key={col.key} onClick={() => handleSort(col.key)} className={`px-3 py-2 font-semibold border-b border-gray-100 cursor-pointer hover:bg-gray-100 select-none transition-colors ${col.align}`}>
+                        <span className="inline-flex items-center gap-0.5">{col.label}<SortIcon col={col.key} /></span>
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 font-semibold border-b border-gray-100 text-center w-16">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
-                      <td className="p-4 text-sm text-slate-600">
-                        <div className="font-medium text-slate-800">{order.region}</div>
-                        <div className="text-xs text-slate-500">{order.country}</div>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600">{order.model}</td>
-                      <td className="p-4 text-sm text-right font-medium text-slate-700">{order.quantity}</td>
-                      <td className="p-4 text-sm text-right text-orange-600 font-semibold">{order.toBeOrdered}</td>
-                      <td className="p-4 text-sm text-right text-blue-600 font-semibold">{order.ordered}</td>
-                      <td className="p-4 text-sm text-right text-green-600 font-semibold">{order.delivered}</td>
-                      <td className="p-4 text-sm">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full 
-                          ${order.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                            order.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
-                            'bg-slate-100 text-slate-800'}`}>
-                          {order.status || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-right space-x-3">
-                        <button onClick={() => setEditingOrder(order)} className="text-indigo-600 hover:text-indigo-900 font-medium">Edit</button>
-                        <button onClick={() => deleteOrder(order.id)} className="text-red-500 hover:text-red-700 font-medium">Delete</button>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-gray-100">
+                  {orders.map(order => {
+                    const pending = Math.max(0, order.quantity - order.ordered);
+                    return (
+                      <tr key={order.id} className="hover:bg-blue-50/40 transition-colors">
+                        <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{order.region}</td>
+                        <td className="px-3 py-1.5 text-xs text-gray-600">{order.country}</td>
+                        <td className="px-3 py-1.5 text-xs text-gray-600">{order.model}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-medium text-gray-700">{order.quantity.toLocaleString()}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-semibold text-blue-600">{order.ordered.toLocaleString()}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{pending.toLocaleString()}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-semibold text-emerald-600">{order.delivered.toLocaleString()}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full leading-relaxed
+                            ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                              order.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                              order.status === 'Ordered' ? 'bg-purple-100 text-purple-700' :
+                              order.status === 'Partially Delivered' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'}`}>
+                            {order.status || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => setEditingOrder(order)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => deleteOrder(order.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-slate-500">No orders match the current filters.</td>
+                      <td colSpan={9} className="p-10 text-center text-gray-400 text-sm">No orders match the current filters.</td>
                     </tr>
                   )}
                 </tbody>
@@ -394,48 +345,60 @@ export default function Home() {
 
       {/* Edit Modal */}
       {editingOrder && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-800">Edit Order: {editingOrder.id}</h3>
-              <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">Edit Order: <span className="font-mono text-gray-500">{editingOrder.id}</span></h3>
+              <button onClick={() => setEditingOrder(null)} className="text-gray-400 hover:text-gray-600 p-1"><X size={18} /></button>
             </div>
-            <form onSubmit={saveOrder} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={saveOrder} className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Region</label>
-                  <input type="text" value={editingOrder.region} onChange={e => setEditingOrder({...editingOrder, region: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Region</label>
+                  <input type="text" value={editingOrder.region} onChange={e => setEditingOrder({ ...editingOrder, region: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Country</label>
-                  <input type="text" value={editingOrder.country} onChange={e => setEditingOrder({...editingOrder, country: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Country</label>
+                  <input type="text" value={editingOrder.country} onChange={e => setEditingOrder({ ...editingOrder, country: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Model</label>
-                  <input type="text" value={editingOrder.model} onChange={e => setEditingOrder({...editingOrder, model: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Model</label>
+                  <input type="text" value={editingOrder.model} onChange={e => setEditingOrder({ ...editingOrder, model: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                  <input type="text" value={editingOrder.status || ''} onChange={e => setEditingOrder({...editingOrder, status: e.target.value})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Status</label>
+                  <select value={editingOrder.status || ''} onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value || null })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                    <option value="">None</option>
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ordered</label>
-                  <input type="number" value={editingOrder.ordered} onChange={e => setEditingOrder({...editingOrder, ordered: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Total Qty</label>
+                  <input type="number" value={editingOrder.quantity} onChange={e => setEditingOrder({ ...editingOrder, quantity: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Delivered</label>
-                  <input type="number" value={editingOrder.delivered} onChange={e => setEditingOrder({...editingOrder, delivered: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Ordered</label>
+                  <input type="number" value={editingOrder.ordered} onChange={e => setEditingOrder({ ...editingOrder, ordered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Delivered</label>
+                  <input type="number" value={editingOrder.delivered} onChange={e => setEditingOrder({ ...editingOrder, delivered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Pending Qty</label>
+                  <div className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md text-amber-600 font-semibold">
+                    {Math.max(0, editingOrder.quantity - editingOrder.ordered).toLocaleString()}
+                  </div>
                 </div>
               </div>
-              <div className="pt-4 flex justify-end space-x-3">
-                <button type="button" onClick={() => setEditingOrder(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors">Save Changes</button>
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setEditingOrder(null)} className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
+                <button type="submit" className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors">Save Changes</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </main>
   );
 }

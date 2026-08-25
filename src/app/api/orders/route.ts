@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,21 +10,23 @@ export async function GET(request: Request) {
     const country = searchParams.get('country');
     const status = searchParams.get('status');
 
-    const where: any = {};
-    if (region) where.region = region;
-    if (country) where.country = country;
-    if (status) where.status = status;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
 
-    const orders = await prisma.assetOrder.findMany({ where });
-    return NextResponse.json(orders);
+    if (region) { conditions.push(`"region" = $${idx++}`); params.push(region); }
+    if (country) { conditions.push(`"country" = $${idx++}`); params.push(country); }
+    if (status) { conditions.push(`"status" = $${idx++}`); params.push(status); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `SELECT * FROM "AssetOrder" ${where} ORDER BY "id" ASC`;
+
+    const result = await query(sql, params);
+    return NextResponse.json(result.rows);
   } catch (error: any) {
     console.error('Error fetching orders:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to fetch orders',
-        message: error?.message || String(error),
-        code: error?.code,
-      },
+      { error: 'Failed to fetch orders', message: error?.message || String(error), code: error?.code },
       { status: 500 }
     );
   }
@@ -33,32 +35,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newOrder = await prisma.assetOrder.create({
-      data: {
-        id: body.id,
-        bundle: body.bundle,
-        region: body.region,
-        country: body.country,
-        model: body.model,
-        quantity: body.quantity || 0,
-        inProgress: body.inProgress || 0,
-        ordered: body.ordered || 0,
-        inTransit: body.inTransit || 0,
-        delivered: body.delivered || 0,
-        toBeOrdered: body.toBeOrdered || 0,
-        status: body.status,
-        lastUpdatedBy: body.lastUpdatedBy,
-      },
-    });
-    return NextResponse.json(newOrder, { status: 201 });
+    await query(
+      `INSERT INTO "AssetOrder" ("id", "bundle", "region", "country", "model", "quantity", "inProgress", "ordered", "inTransit", "delivered", "toBeOrdered", "status", "lastUpdatedBy", "lastUpdatedOn")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())`,
+      [body.id, body.bundle ?? null, body.region, body.country, body.model,
+       body.quantity || 0, body.inProgress || 0, body.ordered || 0,
+       body.inTransit || 0, body.delivered || 0, body.toBeOrdered || 0,
+       body.status ?? null, body.lastUpdatedBy ?? null]
+    );
+    const result = await query(`SELECT * FROM "AssetOrder" WHERE "id" = $1`, [body.id]);
+    return NextResponse.json(result.rows[0], { status: 201 });
   } catch (error: any) {
     console.error('Error creating order:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to create order',
-        message: error?.message || String(error),
-        code: error?.code,
-      },
+      { error: 'Failed to create order', message: error?.message || String(error), code: error?.code },
       { status: 500 }
     );
   }
