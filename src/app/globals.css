@@ -26,3 +26,26 @@ body {
   scrollbar-width: thin;
   scrollbar-color: #c7d2de transparent;
 }
+
+@keyframes slide-in-from-right-5 {
+  from { transform: translateX(1.25rem); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.slide-in-from-right-5 {
+  animation-name: slide-in-from-right-5;
+}
+
+@media (max-width: 640px) {
+  .max-w-\[1400px\] {
+    max-width: 100%;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}

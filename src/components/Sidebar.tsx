@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Package, RefreshCw, TrendingUp, Briefcase, DollarSign, ChevronLeft, ChevronRight, Menu, X, Lock } from 'lucide-react';
+import { Package, RefreshCw, TrendingUp, Briefcase, DollarSign, ChevronLeft, ChevronRight, Menu, X, Lock, Tag, Wallet } from 'lucide-react';
 
 const NAV_ITEMS = [
   { label: 'Asset Ordering', icon: Package, href: '/' },
+  { label: 'Price Config', icon: Tag, href: '/price-configuration' },
+  { label: 'Budget Mgmt', icon: Wallet, href: '/budget-management' },
   { label: 'PC Refresh', icon: RefreshCw, href: '/intelligent-pc-refresh', comingSoon: true },
   { label: 'Procurement Forecast', icon: TrendingUp, href: '/procurement-forecast', comingSoon: true },
   { label: 'Business IT', icon: Briefcase, href: '/business-it', comingSoon: true },
