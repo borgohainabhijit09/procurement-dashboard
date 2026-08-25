@@ -575,9 +575,9 @@ export default function Home() {
         {filteredBudgetSummary && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Approved Budget', value: `\u20AC${filteredBudgetSummary.totals.approved.toLocaleString()}`, icon: Wallet, bg: 'bg-blue-50', fg: 'text-[#0B5ED7]' },
-              { label: 'Total Spent', value: `\u20AC${filteredBudgetSummary.totals.spent.toLocaleString()}`, icon: TrendingDown, bg: 'bg-red-50', fg: 'text-red-600' },
-              { label: 'Carryover Savings', value: `\u20AC${filteredBudgetSummary.totals.carryover.toLocaleString()}`, icon: TrendingUp, bg: 'bg-emerald-50', fg: 'text-emerald-600' },
+              { label: 'Approved Budget', value: `€${filteredBudgetSummary.totals.approved.toLocaleString()}`, icon: Wallet, bg: 'bg-blue-50', fg: 'text-[#0B5ED7]' },
+              { label: 'Total Spent', value: `€${filteredBudgetSummary.totals.spent.toLocaleString()}`, icon: TrendingDown, bg: 'bg-red-50', fg: 'text-red-600' },
+              { label: 'Carryover Savings', value: `€${filteredBudgetSummary.totals.carryover.toLocaleString()}`, icon: TrendingUp, bg: 'bg-emerald-50', fg: 'text-emerald-600' },
               { label: 'Budget Utilization', value: `${filteredBudgetSummary.totals.utilization}%`, icon: Percent, bg: 'bg-amber-50', fg: 'text-amber-600' },
             ].map(kpi => (
               <div key={kpi.label} className="bg-white px-4 py-3 rounded-lg shadow-sm border border-gray-200 flex items-center gap-3">
@@ -630,7 +630,7 @@ export default function Home() {
                 <h3 className="text-sm font-semibold text-gray-700">Budget Overview — {filteredBudgetSummary.period}</h3>
                 {filteredBudgetSummary.totals.carryover > 0 && (
                   <p className="text-[10px] text-emerald-600 mt-0.5">
-                    +\u20AC{filteredBudgetSummary.totals.carryover.toLocaleString()} savings carried over from {filteredBudgetSummary.previousPeriod}
+                    +€{filteredBudgetSummary.totals.carryover.toLocaleString()} savings carried over from {filteredBudgetSummary.previousPeriod}
                   </p>
                 )}
               </div>
@@ -680,28 +680,28 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Budget</span>
-                        <span className="font-medium text-gray-600">\u20AC{item.approved.toLocaleString()}</span>
+                        <span className="font-medium text-gray-600">€{item.approved.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Spent</span>
-                        <span className="font-medium text-amber-600">\u20AC{item.spent.toLocaleString()}</span>
+                        <span className="font-medium text-amber-600">€{item.spent.toLocaleString()}</span>
                       </div>
                       {item.carryover > 0 && (
                         <>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Carryover</span>
-                            <span className="font-medium text-emerald-600">+\u20AC{item.carryover.toLocaleString()}</span>
+                            <span className="font-medium text-emerald-600">+€{item.carryover.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">Available</span>
-                            <span className="font-medium text-gray-700">\u20AC{item.totalAvailable.toLocaleString()}</span>
+                            <span className="font-medium text-gray-700">€{item.totalAvailable.toLocaleString()}</span>
                           </div>
                         </>
                       )}
                       <div className="flex justify-between col-span-2">
                         <span className="text-gray-400">Remaining</span>
                         <span className={`font-semibold ${item.remaining > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          \u20AC{item.remaining.toLocaleString()}
+                          €{item.remaining.toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -917,7 +917,7 @@ export default function Home() {
                                             {slot.status || 'Pending'}
                                           </span>
                                         </td>
-                                        <td className="py-1 px-2 text-right text-gray-600">{slot.pricePerUnit ? `\u20AC${Number(slot.pricePerUnit).toLocaleString()}` : '--'}</td>
+                                        <td className="py-1 px-2 text-right text-gray-600">{slot.pricePerUnit ? `€${Number(slot.pricePerUnit).toLocaleString()}` : '--'}</td>
                                         <td className="py-1 px-2 text-right">
                                           <button onClick={() => openEditSlot(order, slot)} className="text-gray-400 hover:text-[#0B5ED7] mr-1"><Pencil size={11} /></button>
                                           <button onClick={() => deleteSlot(slot.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={11} /></button>
