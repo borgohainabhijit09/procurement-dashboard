@@ -9,18 +9,64 @@ datasource db {
 }
 
 model AssetOrder {
-  id            String    @id
-  bundle        Int?
-  region        String
-  country       String
-  model         String
-  quantity      Int       @default(0)
-  inProgress    Int       @default(0)
-  ordered       Int       @default(0)
-  inTransit     Int       @default(0)
-  delivered     Int       @default(0)
-  toBeOrdered   Int       @default(0)
-  status        String?
-  lastUpdatedBy String?
-  lastUpdatedOn DateTime? @default(now())
+  id              String       @id
+  bundle          Int?
+  region          String
+  country         String
+  model           String
+  quantity        Int          @default(0)
+  inProgress      Int          @default(0)
+  ordered         Int          @default(0)
+  inTransit       Int          @default(0)
+  delivered       Int          @default(0)
+  toBeOrdered     Int          @default(0)
+  status          String?
+  halfYearPeriod  String?      @default("H2-2026")
+  lastUpdatedBy   String?
+  lastUpdatedOn   DateTime?    @default(now())
+
+  slots           OrderSlot[]
+}
+
+model OrderSlot {
+  id              String       @id
+  assetOrderId    String
+  assetOrder      AssetOrder   @relation(fields: [assetOrderId], references: [id], onDelete: Cascade)
+  slotNumber      Int          @default(1)
+  orderedQty      Int          @default(0)
+  orderDate       DateTime?
+  eta             DateTime?
+  status          String?      @default("Pending")
+  pricePerUnit    Decimal?     @db.Decimal(12, 2)
+  lastUpdatedBy   String?
+  lastUpdatedOn   DateTime?    @default(now())
+
+  @@index([assetOrderId])
+  @@index([status])
+}
+
+model ModelPrice {
+  id              String       @id
+  model           String
+  country         String
+  pricePerUnit    Decimal      @db.Decimal(12, 2)
+  monthYear       String
+  lastUpdatedBy   String?
+  lastUpdatedOn   DateTime?    @default(now())
+
+  @@unique([model, country, monthYear])
+  @@index([country])
+  @@index([monthYear])
+}
+
+model CountryBudget {
+  id              String       @id
+  country         String
+  halfYearPeriod  String
+  approvedBudget  Decimal      @db.Decimal(14, 2) @default(0)
+  lastUpdatedBy   String?
+  lastUpdatedOn   DateTime?    @default(now())
+
+  @@unique([country, halfYearPeriod])
+  @@index([halfYearPeriod])
 }
