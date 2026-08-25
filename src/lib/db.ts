@@ -1,15 +1,26 @@
-import { Pool } from 'pg';
+import { Pool, type PoolConfig } from 'pg';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 5,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
+let _pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!_pool) {
+    const config: PoolConfig = {
+      connectionString: process.env.DATABASE_URL,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
+    if (process.env.NODE_ENV === 'production') {
+      config.ssl = { rejectUnauthorized: false };
+    }
+    _pool = new Pool(config);
+  }
+  return _pool;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function query(text: string, params?: any[]) {
+  const pool = getPool();
   const client = await pool.connect();
   try {
     const result = await client.query(text, params);
