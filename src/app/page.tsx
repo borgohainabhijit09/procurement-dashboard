@@ -22,7 +22,7 @@ type AssetOrder = {
   lastUpdatedOn: string;
 };
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#0B5ED7', '#00A3E0', '#00B050', '#F59E0B', '#7B2D8E', '#003399'];
 
 const STATUS_OPTIONS = ['Pending', 'In Progress', 'Ordered', 'Partially Delivered', 'Completed'];
 
@@ -74,7 +74,7 @@ export default function Home() {
 
   const SortIcon = ({ col }: { col: keyof AssetOrder | 'pending' }) => {
     if (sortKey !== col) return <ArrowUpDown size={11} className="text-gray-300 ml-0.5" />;
-    return sortDir === 'asc' ? <ArrowUp size={11} className="text-blue-600 ml-0.5" /> : <ArrowDown size={11} className="text-blue-600 ml-0.5" />;
+    return sortDir === 'asc' ? <ArrowUp size={11} className="text-[#0B5ED7] ml-0.5" /> : <ArrowDown size={11} className="text-[#0B5ED7] ml-0.5" />;
   };
 
   const exportToExcel = () => {
@@ -171,47 +171,46 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 text-slate-900 font-sans">
+    <main className="min-h-screen bg-[#f4f6f8] text-slate-900 font-sans">
+      <div className="h-1 bg-[#003399]" />
       <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4">
 
         {/* Header */}
-        <header className="bg-white rounded-lg shadow-sm border border-gray-200 px-5 py-3">
+        <header className="bg-[#003399] rounded-lg shadow-sm px-5 py-3">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Package size={20} className="text-white" />
-              </div>
+              <img src="/logo.png" alt="Philips" className="h-8 w-auto" />
               <div>
-                <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-tight">Asset Ordering Dashboard</h1>
-                <p className="text-xs text-gray-400">Region & country-wise tracking</p>
+                <h1 className="text-lg font-bold text-white tracking-tight leading-tight">Asset Ordering DEX</h1>
+                <p className="text-[11px] text-blue-200">Region & country-wise tracking</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex flex-col">
-                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Region</label>
-                <select value={regionFilter} onChange={e => handleRegionChange(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]">
-                  <option value="">All Regions</option>
-                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                <label className="text-[10px] font-semibold text-blue-200 mb-0.5 uppercase tracking-wider">Region</label>
+                <select value={regionFilter} onChange={e => handleRegionChange(e.target.value)} className="px-2.5 py-1.5 text-sm border border-blue-400/30 rounded-md bg-white/10 text-white focus:ring-1 focus:ring-white/50 focus:border-white/50 outline-none min-w-[130px]">
+                  <option value="" className="text-gray-900">All Regions</option>
+                  {regions.map(r => <option key={r} value={r} className="text-gray-900">{r}</option>)}
                 </select>
               </div>
               <div className="flex flex-col">
-                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Country</label>
-                <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]" disabled={!regionFilter && countries.length > 20}>
-                  <option value="">All Countries</option>
-                  {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                <label className="text-[10px] font-semibold text-blue-200 mb-0.5 uppercase tracking-wider">Country</label>
+                <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-blue-400/30 rounded-md bg-white/10 text-white focus:ring-1 focus:ring-white/50 focus:border-white/50 outline-none min-w-[130px]" disabled={!regionFilter && countries.length > 20}>
+                  <option value="" className="text-gray-900">All Countries</option>
+                  {countries.map(c => <option key={c} value={c} className="text-gray-900">{c}</option>)}
                 </select>
               </div>
               <div className="flex flex-col">
-                <label className="text-[10px] font-semibold text-gray-400 mb-0.5 uppercase tracking-wider">Status</label>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none min-w-[130px]">
-                  <option value="">All Statuses</option>
-                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                <label className="text-[10px] font-semibold text-blue-200 mb-0.5 uppercase tracking-wider">Status</label>
+                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2.5 py-1.5 text-sm border border-blue-400/30 rounded-md bg-white/10 text-white focus:ring-1 focus:ring-white/50 focus:border-white/50 outline-none min-w-[130px]">
+                  <option value="" className="text-gray-900">All Statuses</option>
+                  {statuses.map(s => <option key={s} value={s} className="text-gray-900">{s}</option>)}
                 </select>
               </div>
-              <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors flex items-center gap-1.5">
+              <button onClick={() => { setRegionFilter(''); setCountryFilter(''); setStatusFilter(''); }} className="px-3 py-1.5 text-sm text-white bg-white/10 hover:bg-white/20 rounded-md transition-colors flex items-center gap-1.5">
                 <RotateCcw size={13} /> Clear
               </button>
-              <button onClick={exportToExcel} disabled={orders.length === 0} className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-colors flex items-center gap-1.5">
+              <button onClick={exportToExcel} disabled={orders.length === 0} className="px-3 py-1.5 text-sm bg-[#00B050] hover:bg-[#00913F] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md transition-colors flex items-center gap-1.5">
                 <Download size={13} /> Export Excel
               </button>
             </div>
@@ -221,7 +220,7 @@ export default function Home() {
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Total Ordered', value: kpis.totalOrdered, icon: Package, bg: 'bg-blue-50', fg: 'text-blue-600' },
+            { label: 'Total Ordered', value: kpis.totalOrdered, icon: Package, bg: 'bg-blue-50', fg: 'text-[#0B5ED7]' },
             { label: 'Delivered', value: kpis.totalDelivered, icon: CheckCircle, bg: 'bg-emerald-50', fg: 'text-emerald-600' },
             { label: 'In Transit', value: kpis.totalInTransit, icon: Truck, bg: 'bg-amber-50', fg: 'text-amber-600' },
             { label: 'In Progress', value: kpis.totalInProgress, icon: Activity, bg: 'bg-purple-50', fg: 'text-purple-600' },
@@ -246,7 +245,7 @@ export default function Home() {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[3, 3, 0, 0]} onClick={(data) => setRegionFilter(String(data?.name || ''))} className="cursor-pointer" />
+                  <Bar dataKey="value" fill="#0B5ED7" radius={[3, 3, 0, 0]} onClick={(data) => setRegionFilter(String(data?.name || ''))} className="cursor-pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -271,7 +270,7 @@ export default function Home() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {loading && orders.length === 0 ? (
             <div className="p-10 text-center text-gray-400 flex flex-col items-center">
-              <Activity className="animate-spin mb-3 text-blue-500" size={24} />
+              <Activity className="animate-spin mb-3 text-[#0B5ED7]" size={24} />
               <span className="text-sm">Loading data...</span>
             </div>
           ) : (
@@ -300,18 +299,18 @@ export default function Home() {
                   {orders.map(order => {
                     const pending = Math.max(0, order.quantity - order.ordered);
                     return (
-                      <tr key={order.id} className="hover:bg-blue-50/40 transition-colors">
+                      <tr key={order.id} className="hover:bg-[#E8F0FE]/40 transition-colors">
                         <td className="px-3 py-1.5 text-xs font-medium text-gray-700">{order.region}</td>
                         <td className="px-3 py-1.5 text-xs text-gray-600">{order.country}</td>
                         <td className="px-3 py-1.5 text-xs text-gray-600">{order.model}</td>
                         <td className="px-3 py-1.5 text-xs text-right font-medium text-gray-700">{order.quantity.toLocaleString()}</td>
-                        <td className="px-3 py-1.5 text-xs text-right font-semibold text-blue-600">{order.ordered.toLocaleString()}</td>
+                        <td className="px-3 py-1.5 text-xs text-right font-semibold text-[#0B5ED7]">{order.ordered.toLocaleString()}</td>
                         <td className="px-3 py-1.5 text-xs text-right font-semibold text-amber-600">{pending.toLocaleString()}</td>
                         <td className="px-3 py-1.5 text-xs text-right font-semibold text-emerald-600">{order.delivered.toLocaleString()}</td>
                         <td className="px-3 py-1.5">
                           <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full leading-relaxed
                             ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                              order.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                              order.status === 'In Progress' ? 'bg-[#E0EBFA] text-[#0840A0]' :
                               order.status === 'Ordered' ? 'bg-purple-100 text-purple-700' :
                               order.status === 'Partially Delivered' ? 'bg-amber-100 text-amber-700' :
                               'bg-gray-100 text-gray-600'}`}>
@@ -320,7 +319,7 @@ export default function Home() {
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => setEditingOrder(order)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit">
+                            <button onClick={() => setEditingOrder(order)} className="p-1.5 text-gray-400 hover:text-[#0B5ED7] hover:bg-[#E8F0FE] rounded transition-colors" title="Edit">
                               <Pencil size={14} />
                             </button>
                             <button onClick={() => deleteOrder(order.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
@@ -347,42 +346,42 @@ export default function Home() {
       {editingOrder && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">Edit Order: <span className="font-mono text-gray-500">{editingOrder.id}</span></h3>
+            <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100 bg-[#003399]">
+              <h3 className="text-sm font-bold text-white">Edit Order: <span className="font-mono text-blue-200">{editingOrder.id}</span></h3>
               <button onClick={() => setEditingOrder(null)} className="text-gray-400 hover:text-gray-600 p-1"><X size={18} /></button>
             </div>
             <form onSubmit={saveOrder} className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Region</label>
-                  <input type="text" value={editingOrder.region} onChange={e => setEditingOrder({ ...editingOrder, region: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="text" value={editingOrder.region} onChange={e => setEditingOrder({ ...editingOrder, region: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Country</label>
-                  <input type="text" value={editingOrder.country} onChange={e => setEditingOrder({ ...editingOrder, country: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="text" value={editingOrder.country} onChange={e => setEditingOrder({ ...editingOrder, country: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Model</label>
-                  <input type="text" value={editingOrder.model} onChange={e => setEditingOrder({ ...editingOrder, model: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="text" value={editingOrder.model} onChange={e => setEditingOrder({ ...editingOrder, model: e.target.value })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Status</label>
-                  <select value={editingOrder.status || ''} onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value || null })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                  <select value={editingOrder.status || ''} onChange={e => setEditingOrder({ ...editingOrder, status: e.target.value || null })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none bg-white">
                     <option value="">None</option>
                     {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Total Qty</label>
-                  <input type="number" value={editingOrder.quantity} onChange={e => setEditingOrder({ ...editingOrder, quantity: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="number" value={editingOrder.quantity} onChange={e => setEditingOrder({ ...editingOrder, quantity: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Ordered</label>
-                  <input type="number" value={editingOrder.ordered} onChange={e => setEditingOrder({ ...editingOrder, ordered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="number" value={editingOrder.ordered} onChange={e => setEditingOrder({ ...editingOrder, ordered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Delivered</label>
-                  <input type="number" value={editingOrder.delivered} onChange={e => setEditingOrder({ ...editingOrder, delivered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                  <input type="number" value={editingOrder.delivered} onChange={e => setEditingOrder({ ...editingOrder, delivered: parseInt(e.target.value) || 0 })} className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-[#0B5ED7] focus:border-[#0B5ED7] outline-none" required />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide">Pending Qty</label>
@@ -393,12 +392,17 @@ export default function Home() {
               </div>
               <div className="pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setEditingOrder(null)} className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors">Save Changes</button>
+                <button type="submit" className="px-4 py-1.5 text-sm bg-[#0B5ED7] hover:bg-[#0840A0] text-white rounded-md shadow-sm transition-colors">Save Changes</button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="mt-6 pb-4 text-center">
+        <p className="text-[10px] text-gray-400">Philips DEX &middot; Asset Ordering Internal Tool &middot; {new Date().getFullYear()}</p>
+      </footer>
     </main>
   );
 }
