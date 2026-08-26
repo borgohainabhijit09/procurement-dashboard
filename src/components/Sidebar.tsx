@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Package, RefreshCw, TrendingUp, Briefcase, DollarSign, ChevronLeft, ChevronRight, Menu, X, Lock, Tag, Wallet, Brain } from 'lucide-react';
+import { Package, RefreshCw, TrendingUp, Briefcase, ChevronLeft, ChevronRight, Menu, X, Lock, Tag, Wallet, Brain } from 'lucide-react';
 
 const NAV_ITEMS = [
   { label: 'Asset Ordering', icon: Package, href: '/' },
@@ -12,7 +12,6 @@ const NAV_ITEMS = [
   { label: 'PC Refresh', icon: RefreshCw, href: '/intelligent-pc-refresh', comingSoon: true },
   { label: 'Procurement Forecast', icon: Brain, href: '/procurement-forecast' },
   { label: 'Business IT', icon: Briefcase, href: '/business-it', comingSoon: true },
-  { label: 'Financial Analysis', icon: DollarSign, href: '/financial-analysis', comingSoon: true },
 ];
 
 function getInitialCollapsed() {
