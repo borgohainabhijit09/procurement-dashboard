@@ -70,3 +70,77 @@ model CountryBudget {
   @@unique([country, halfYearPeriod])
   @@index([halfYearPeriod])
 }
+
+// ── Procurement Forecast module ──────────────────────────────
+
+model FutureJoiner {
+  id              String    @id
+  candidateName   String
+  country         String
+  city            String?
+  function        String?
+  deviceCategory  String
+  model           String?
+  startDate       DateTime?
+  status          String    @default("Pending")
+  hiringManager   String?
+  businessUnit    String?
+  department      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([country])
+  @@index([status])
+  @@index([deviceCategory])
+  @@index([startDate])
+}
+
+model FutureLeaver {
+  id              String    @id
+  employeeName    String
+  country         String
+  city            String?
+  function        String?
+  deviceCategory  String
+  model           String?
+  lastWorkingDay  DateTime?
+  status          String    @default("Pending")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([country])
+  @@index([status])
+  @@index([deviceCategory])
+  @@index([lastWorkingDay])
+}
+
+model BreakfixIncident {
+  id              String    @id
+  country         String
+  deviceCategory  String
+  model           String?
+  incidentCount   Int       @default(0)
+  month           String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([country, deviceCategory, month])
+  @@index([country])
+  @@index([month])
+  @@index([deviceCategory])
+}
+
+model DeviceStock {
+  id              String    @id
+  country         String
+  deviceCategory  String
+  model           String?
+  quantity        Int       @default(0)
+  lastUpdated     DateTime? @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([country, deviceCategory])
+  @@index([country])
+  @@index([deviceCategory])
+}
